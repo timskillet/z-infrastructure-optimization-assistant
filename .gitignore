@@ -1,0 +1,15 @@
+# Virtual Environments
+venv/
+
+# Python Bytecode & Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Sensitive Environment Variables (API Keys, etc.)
+.env
+.env.local
+
+# IDEs and Editors
+.vscode/
