@@ -3,7 +3,7 @@ zosmf:
   port: 6443
   username: ${ZOSMF_USER}
   password: ${ZOSMF_PASS}
-  verify_ssl: false
+  verify_ssl: true
 
 db2:
   host: ${DB2_HOST}
