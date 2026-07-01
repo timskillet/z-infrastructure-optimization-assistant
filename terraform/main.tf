@@ -120,6 +120,7 @@ resource "ibm_is_floating_ip" "z_floating_ip" {
   name   = "z-optimization-public-ip"
   target = ibm_is_instance.z_instance.primary_network_interface[0].id
   tags   = ["z-optimization"]
+  resource_group_id = data.ibm_resource_group.default.id
 }
 
 # ---------------------------------------------------------------------------
