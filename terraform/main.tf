@@ -58,7 +58,10 @@ variable "ssh_allowed_cidr" {
 }
 
 # ---------------------------------------------------------------------------
-# Data sources — resources provisioned via console, not managed here
+# Data sources — existing account-level resources not managed by Terraform
+# (VPC, subnet, and security group were provisioned by IBM Cloud Foundation
+#  for VPC and are shared infrastructure; managing them here would risk
+#  accidental destruction of resources outside this project's scope)
 # ---------------------------------------------------------------------------
 
 data "ibm_resource_group" "default" {
@@ -84,18 +87,11 @@ data "ibm_is_ssh_key" "ssh_key" {
   name = var.ssh_key_name
 }
 
-# Floating IP provisioned via console
-data "ibm_is_floating_ip" "z_floating_ip" {
-  name = "z-optimization-public-ip"
-}
 
 # ---------------------------------------------------------------------------
-# VSI instance
-# Provisioned via console — import before first apply:
-#   terraform import ibm_is_instance.z_instance 0717_d8416df3-e41c-481c-97ee-d2375b67d898
-# After import, run `terraform plan` and verify no -/+ (destroy/recreate) diffs
-# before applying. Fields like image, vpc, zone, and primary_network_interface
-# are ForceNew — any drift from the console config will trigger replacement.
+# VSI instance + floating IP — fully Terraform-managed
+# The original console-provisioned instance was deleted so Terraform owns the
+# full lifecycle: create, resize, reprovision, destroy.
 # ---------------------------------------------------------------------------
 
 resource "ibm_is_instance" "z_instance" {
@@ -118,6 +114,13 @@ resource "ibm_is_instance" "z_instance" {
   }
 
   tags = ["z-optimization", "terraform"]
+}
+
+resource "ibm_is_floating_ip" "z_floating_ip" {
+  name   = "z-optimization-public-ip"
+  target = ibm_is_instance.z_instance.primary_network_interface[0].id
+  tags   = ["z-optimization"]
+  resource_group_id = data.ibm_resource_group.default.id
 }
 
 # ---------------------------------------------------------------------------
@@ -213,22 +216,22 @@ output "instance_private_ip" {
 }
 
 output "public_ip" {
-  value       = data.ibm_is_floating_ip.z_floating_ip.address
+  value       = ibm_is_floating_ip.z_floating_ip.address
   description = "Public IP — use for SSH and API access"
 }
 
 output "ssh_command" {
-  value       = "ssh -i /path/to/key ubuntu@${data.ibm_is_floating_ip.z_floating_ip.address}"
+  value       = "ssh -i /path/to/key ubuntu@${ibm_is_floating_ip.z_floating_ip.address}"
   description = "SSH command"
 }
 
 output "fastapi_url" {
-  value       = "http://${data.ibm_is_floating_ip.z_floating_ip.address}:8000"
+  value       = "http://${ibm_is_floating_ip.z_floating_ip.address}:8000"
   description = "FastAPI backend URL"
 }
 
 output "streamlit_url" {
-  value       = "http://${data.ibm_is_floating_ip.z_floating_ip.address}:8501"
+  value       = "http://${ibm_is_floating_ip.z_floating_ip.address}:8501"
   description = "Streamlit UI URL"
 }
 
