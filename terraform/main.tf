@@ -21,6 +21,11 @@ variable "ibm_region" {
   description = "IBM Cloud region"
   type        = string
   default     = "us-south"
+
+  validation {
+    condition     = var.ibm_region == "us-south"
+    error_message = "Only us-south is supported; instance_image default is region-specific."
+  }
 }
 
 variable "instance_name" {
@@ -44,6 +49,12 @@ variable "instance_image" {
 variable "ssh_key_name" {
   description = "Name of existing SSH key in IBM Cloud"
   type        = string
+}
+
+variable "ssh_allowed_cidr" {
+  description = "CIDR allowed to reach SSH (port 22). Restrict to your IP in production."
+  type        = string
+  default     = "0.0.0.0/0"
 }
 
 # ---------------------------------------------------------------------------
@@ -74,15 +85,17 @@ data "ibm_is_ssh_key" "ssh_key" {
 }
 
 # Floating IP provisioned via console
-# Import: terraform import ibm_is_floating_ip.z_floating_ip r006-4a5c3af8-2d1c-4b1f-a484-273cd9f5183d
 data "ibm_is_floating_ip" "z_floating_ip" {
   name = "z-optimization-public-ip"
 }
 
 # ---------------------------------------------------------------------------
 # VSI instance
-# Provisioned via console — import before applying:
+# Provisioned via console — import before first apply:
 #   terraform import ibm_is_instance.z_instance 0717_d8416df3-e41c-481c-97ee-d2375b67d898
+# After import, run `terraform plan` and verify no -/+ (destroy/recreate) diffs
+# before applying. Fields like image, vpc, zone, and primary_network_interface
+# are ForceNew — any drift from the console config will trigger replacement.
 # ---------------------------------------------------------------------------
 
 resource "ibm_is_instance" "z_instance" {
@@ -115,7 +128,7 @@ resource "ibm_is_instance" "z_instance" {
 resource "ibm_is_security_group_rule" "allow_ssh" {
   group     = data.ibm_is_security_group.z_sg.id
   direction = "inbound"
-  remote    = "0.0.0.0/0"
+  remote    = var.ssh_allowed_cidr
   tcp {
     port_min = 22
     port_max = 22
@@ -227,4 +240,14 @@ output "cos_instance_id" {
 output "cos_docs_bucket" {
   value       = ibm_cos_bucket.z_documentation.bucket_name
   description = "RAG documentation bucket name"
+}
+
+output "cos_models_bucket" {
+  value       = ibm_cos_bucket.models.bucket_name
+  description = "Model checkpoints bucket name"
+}
+
+output "cos_traces_bucket" {
+  value       = ibm_cos_bucket.traces.bucket_name
+  description = "Execution traces bucket name"
 }
